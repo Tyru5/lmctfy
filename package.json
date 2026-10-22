@@ -1,11 +1,12 @@
 {
-  "name": "letmeclaudethatforyou",
+  "name": "letmecodexthatforyou",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3999",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "node --test src/lib/*.test.ts src/server/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

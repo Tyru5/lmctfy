@@ -1,12 +1,33 @@
-export const AGENT = {
-  name: "Claude Code",
-  short: "Claude",
-  cmd: "claude",
-  promptChar: ">",
-  color: "#d97757",
-  banner: ["✻ Welcome to Claude Code!", "  /help for help"],
-  webUrl: (q: string) => `https://claude.ai/new?q=${encodeURIComponent(q)}`,
+export const AGENTS = {
+  codex: {
+    name: "OpenAI Codex",
+    short: "Codex",
+    cmd: "codex",
+    promptChar: "›",
+    color: "#a8e6cf",
+    icon: "/icon.svg",
+    banner: [">_ OpenAI Codex", "  /help for help"],
+    webUrl: (_q: string) => "https://chatgpt.com/codex",
+  },
+  claude: {
+    name: "Claude Code",
+    short: "Claude",
+    cmd: "claude",
+    promptChar: ">",
+    color: "#d97757",
+    icon: "/claude.svg",
+    banner: ["✻ Welcome to Claude Code!", "  /help for help"],
+    webUrl: (q: string) => `https://claude.ai/new?q=${encodeURIComponent(q)}`,
+  },
 };
+
+export type AgentId = keyof typeof AGENTS;
+
+export function parseAgent(value: unknown): AgentId {
+  if (value === undefined || value === null) return "claude";
+  if (value === "codex" || value === "claude") return value;
+  throw new Error("Unknown agent");
+}
 
 export const MAX_PROMPT = 2000;
 
@@ -31,8 +52,8 @@ export function parseShareQuestion(search: Record<string, unknown>): string {
   return String(search.q ?? "").trim().slice(0, MAX_PROMPT);
 }
 
-export function buildSharePath(q: string, s = "") {
-  const p = new URLSearchParams({ d: encodeQuestion(q.trim().slice(0, MAX_PROMPT)) });
+export function buildSharePath(q: string, s = "", agent: AgentId = "claude") {
+  const p = new URLSearchParams({ a: agent, d: encodeQuestion(q.trim().slice(0, MAX_PROMPT)) });
   if (s) p.set("s", s);
   return `/go?${p.toString()}`;
 }

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { Redis } from "@upstash/redis";
 import type { RunEvent } from "@/server/run";
+import type { AgentId } from "@/lib/agents";
 
 const num = (k: string, d: number) => Number(process.env[k]) || d;
 const CACHE_TTL = 60 * 60 * 24 * 30;
@@ -17,21 +18,21 @@ function db(): Redis | null {
 }
 export const durable = () => db() !== null;
 
-const key = (q: string) => `run:${createHash("sha256").update(q).digest("hex").slice(0, 32)}`;
+const key = (q: string, agent: AgentId) => `run:${agent}:${createHash("sha256").update(q).digest("hex").slice(0, 32)}`;
 
 // ---- transcript cache: one VM per question, ever ---------------------------
 const mem = new Map<string, RunEvent[]>();
 
-export async function getCached(q: string): Promise<RunEvent[] | null> {
+export async function getCached(q: string, agent: AgentId = "claude"): Promise<RunEvent[] | null> {
   const r = db();
-  if (!r) return mem.get(key(q)) ?? null;
-  return (await r.get<RunEvent[]>(key(q))) ?? null;
+  if (!r) return mem.get(key(q, agent)) ?? null;
+  return (await r.get<RunEvent[]>(key(q, agent))) ?? null;
 }
 
-export async function setCached(q: string, events: RunEvent[]): Promise<void> {
+export async function setCached(q: string, events: RunEvent[], agent: AgentId = "claude"): Promise<void> {
   const r = db();
-  if (!r) return void mem.set(key(q), events);
-  await r.set(key(q), events, { ex: CACHE_TTL });
+  if (!r) return void mem.set(key(q, agent), events);
+  await r.set(key(q, agent), events, { ex: CACHE_TTL });
 }
 
 // ---- limits: per-IP window, global concurrency, daily cap -------------------

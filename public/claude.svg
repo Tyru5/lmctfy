@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 10" shape-rendering="crispEdges">
+  <title>Claude Code</title>
+  <g transform="translate(0 2)">
+    <g fill="#d97757">
+      <path d="M3 0h12v2h2v1h-2v1H3V3H1V2h2z"/>
+      <path d="M4 4h1v1H4zm2 0h1v1H6zm5 0h1v1h-1zm2 0h1v1h-1z"/>
+    </g>
+    <path fill="#0a0a0b" d="M5 1h1v1H5zm7 0h1v1h-1z"/>
+  </g>
+</svg>

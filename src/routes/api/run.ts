@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { MAX_PROMPT } from "@/lib/agents";
+import { MAX_PROMPT, parseAgent, type AgentId } from "@/lib/agents";
 import type { RunEvent } from "@/server/run";
 
 export const Route = createFileRoute("/api/run")({
@@ -11,12 +11,15 @@ export const Route = createFileRoute("/api/run")({
         const { verify } = await import("@/server/sign");
 
         const sp = new URL(request.url).searchParams;
+        let agent: AgentId;
+        try { agent = parseAgent(sp.get("a")); }
+        catch { return new Response("unknown agent", { status: 400 }); }
         const q = (sp.get("q") ?? "").trim().slice(0, MAX_PROMPT);
         const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || "local";
 
         if (!q) return new Response("missing q", { status: 400 });
-        if (!verify(q, sp.get("s") ?? undefined)) return new Response("unsigned link", { status: 403 });
-        if (!(await isLive())) return new Response("not configured", { status: 503 });
+        if (!verify(q, sp.get("s") ?? undefined, agent)) return new Response("unsigned link", { status: 403 });
+        if (!(await isLive(agent))) return new Response("not configured", { status: 503 });
 
         const enc = new TextEncoder();
         const sse = (e: unknown) => enc.encode(`data: ${JSON.stringify(e)}\n\n`);
@@ -28,7 +31,7 @@ export const Route = createFileRoute("/api/run")({
         };
 
         // Same question already answered: replay, no VM.
-        const cached = await getCached(q);
+        const cached = await getCached(q, agent);
         if (cached) {
           const body = cached.map(sse).concat(sse({ type: "done", exitCode: 0, cached: true }));
           return new Response(new Blob(body as BlobPart[]), { headers });
@@ -48,8 +51,8 @@ export const Route = createFileRoute("/api/run")({
             };
             const ping = setInterval(() => { try { controller.enqueue(enc.encode(": ping\n\n")); } catch {} }, 15_000);
             try {
-              await runAgent(q, send, request.signal);
-              if (ok && transcript.some((e) => e.type === "text")) await setCached(q, transcript);
+              await runAgent(q, send, request.signal, agent);
+              if (ok && transcript.some((e) => e.type === "text")) await setCached(q, transcript, agent);
             } catch (err) {
               send({ type: "error", message: err instanceof Error ? err.message.slice(0, 200) : "failed" });
               send({ type: "done", exitCode: 1 });

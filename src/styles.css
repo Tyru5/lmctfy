@@ -6,7 +6,13 @@
   --fg: #e8e6e3;
   --muted: #8b8b90;
   --border: #26262b;
+  --accent: #a8e6cf;
+  --accent-light: #edfff8;
+}
+
+[data-agent="claude"] {
   --accent: #d97757;
+  --accent-light: #ffe1d3;
 }
 
 @theme inline {
@@ -121,39 +127,51 @@ body {
 }
 
 /* ---- mascot ---- */
-.claude-word {
+.agent-word {
   position: relative;
   display: inline-block;
   isolation: isolate;
 }
-.claude-word .shimmer {
+.agent-word .shimmer {
   position: relative;
   z-index: 1;
 }
 .peeking-mascot {
   position: absolute;
   left: 50%;
-  bottom: 72%;
+  bottom: 95%;
   z-index: 0;
-  width: 2.15em;
-  height: 0.9em;
+  width: 1.2em;
+  height: 1em;
   overflow: hidden;
   pointer-events: none;
   transform: translateX(-50%);
 }
-.peeking-mascot svg {
+.peeking-mascot img, .peeking-mascot svg {
   display: block;
-  width: 100%;
-  height: 100%;
-}
-.peeking-mascot svg {
   position: absolute;
   bottom: 0;
+  left: calc(50% - 0.425em);
+  width: 0.85em;
+  height: 0.85em;
+  transform-origin: 50% 100%;
+  animation: mascot-peek 5s ease-in-out 3s both;
+}
+.peeking-mascot--claude {
+  bottom: 72%;
+  width: 2.15em;
+  height: 0.9em;
+}
+.peeking-mascot--claude svg {
   left: calc(50% - 0.825em);
   width: 1.65em;
   height: 0.75em;
-  transform-origin: 50% 100%;
-  animation: mascot-peek 5s ease-in-out 3s both;
+}
+.mascot-eyes { animation: mascot-peek-eyes 1.8s steps(1, end) 7s infinite; }
+@keyframes mascot-peek-eyes {
+  0%, 24%, 100% { transform: translateX(0); }
+  25%, 49% { transform: translateX(0.65px); }
+  50%, 74% { transform: translateX(-0.65px); }
 }
 @keyframes mascot-peek {
   0%  { transform: translate(0, 100%) rotate(0); }
@@ -168,21 +186,13 @@ body {
   78% { transform: translate(0, -8%) scale(1.04); }
   86%, 100% { transform: translate(0, 0) scale(1); }
 }
-.peeking-mascot .mascot-eyes {
-  animation: mascot-peek-eyes 1.8s steps(1, end) 7s infinite;
-}
-@keyframes mascot-peek-eyes {
-  0%, 24%, 100% { transform: translateX(0); }
-  25%, 49% { transform: translateX(0.65px); }
-  50%, 74% { transform: translateX(-0.65px); }
-}
 @media (prefers-reduced-motion: reduce) {
   .peeking-mascot { display: none; }
 }
 
 /* ---- heading shimmer: light band sweeps left → right across the word ---- */
 .shimmer {
-  background: linear-gradient(100deg, var(--accent) 42%, #ffe1d3 50%, var(--accent) 58%);
+  background: linear-gradient(100deg, var(--accent) 42%, var(--accent-light) 50%, var(--accent) 58%);
   background-size: 250% 100%;
   background-position: 100% 0;
   -webkit-background-clip: text;

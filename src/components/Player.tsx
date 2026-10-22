@@ -3,13 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Terminal from "@/components/Terminal";
-import { AGENT } from "@/lib/agents";
+import { AGENTS, type AgentId } from "@/lib/agents";
 
 type Line = { text: string; color?: string; muted?: boolean; prefix?: string; prefixColor?: string };
 type Typing = { prefix: string; prefixColor?: string; text: string } | null;
 
-export default function Player({ q, sig, live }: { q: string; sig: string; live: boolean }) {
-  const agent = AGENT;
+export default function Player({ q, sig, live, agentId }: { q: string; sig: string; live: boolean; agentId: AgentId }) {
+  const agent = AGENTS[agentId];
   const target = agent.webUrl(q);
 
   const [lines, setLines] = useState<Line[]>([]);
@@ -52,7 +52,7 @@ export default function Player({ q, sig, live }: { q: string; sig: string; live:
 
     function runLive() {
       setStatus("Thinking");
-      const p = new URLSearchParams({ q, s: sig });
+      const p = new URLSearchParams({ q, s: sig, a: agentId });
       es = new EventSource(`/api/run?${p}`);
       // reveal streamed text a few chars at a time so it reads like a terminal
       reveal = setInterval(() => {
@@ -191,7 +191,7 @@ export default function Player({ q, sig, live }: { q: string; sig: string; live:
       </div>
 
       <p className="text-center text-xs">
-        <Link to="/" className="text-muted hover:text-fg">
+        <Link to="/" search={{ a: agentId }} className="text-muted hover:text-fg">
           Make your own
         </Link>
       </p>
