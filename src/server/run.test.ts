@@ -17,10 +17,11 @@ test("Codex JSONL becomes a transcript across chunk boundaries without duplicate
   const root = await mkdtemp(join(tmpdir(), "lmctfy-run-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   let stopped = false;
-  t.mock.method(Sandbox, "create", async () => ({
+  t.mock.method(Sandbox, "create", async (options: NonNullable<Parameters<typeof Sandbox.create>[0]>) => ({
     mkDir: async (path: string) => { await mkdir(join(root, path), { recursive: true }); },
     runCommand: async ({ cwd, stdout }: { cwd: string; stdout: NodeJS.WritableStream }) => {
       await access(join(root, cwd));
+      await access(join(root, options.env!.CODEX_HOME));
       const jsonl = [
         "not JSON",
         JSON.stringify({ type: "thread.started", thread_id: "test" }),

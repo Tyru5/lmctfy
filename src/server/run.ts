@@ -132,6 +132,7 @@ export async function runAgent(q: string, emit: (e: RunEvent) => void, signal: A
     if (signal.aborted) return;
     // Universal images start in /vercel; the agent workspace is not pre-created.
     await sandbox.mkDir("/vercel/sandbox");
+    if (agent === "codex") await sandbox.mkDir(env.CODEX_HOME);
     emit({ type: "status", text: "Running" });
 
     let buf = "";
