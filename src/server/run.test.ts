@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { access, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { Sandbox } from "@vercel/sandbox";
 import { runAgent, type RunEvent } from "./run.ts";
@@ -10,9 +13,14 @@ test("Codex JSONL becomes a transcript across chunk boundaries without duplicate
     if (previous === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = previous;
   });
+  // Fresh universal images do not contain the command's workspace.
+  const root = await mkdtemp(join(tmpdir(), "lmctfy-run-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
   let stopped = false;
   t.mock.method(Sandbox, "create", async () => ({
-    runCommand: async ({ stdout }: { stdout: NodeJS.WritableStream }) => {
+    mkDir: async (path: string) => { await mkdir(join(root, path), { recursive: true }); },
+    runCommand: async ({ cwd, stdout }: { cwd: string; stdout: NodeJS.WritableStream }) => {
+      await access(join(root, cwd));
       const jsonl = [
         "not JSON",
         JSON.stringify({ type: "thread.started", thread_id: "test" }),
@@ -64,6 +72,7 @@ test("Claude streams its own transcript through direct and Gateway credentials",
         assert.deepEqual(Object.keys(options.networkPolicy.allow), [domain]);
         assert.equal(options.env.ANTHROPIC_BASE_URL, gateway ? "https://ai-gateway.vercel.sh/claude-code" : "https://api.anthropic.com");
         return {
+          mkDir: async () => {},
           runCommand: async ({ cmd, args, stdout }: { cmd: string; args: string[]; stdout: NodeJS.WritableStream }) => {
             assert.equal(cmd, "claude");
             assert.equal(args[args.indexOf("-p") + 1], "Explain 42");
@@ -100,6 +109,7 @@ test("Codex reconnects do not fail the run, but a failed turn reports its error"
   });
   let stopped = false;
   t.mock.method(Sandbox, "create", async () => ({
+    mkDir: async () => {},
     runCommand: async ({ stdout, stderr }: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream }) => {
       stdout.write(JSON.stringify({ type: "error", message: "Reconnecting... 1/5" }) + "\n");
       stdout.write(JSON.stringify({ type: "turn.failed", error: { message: "Rate limit exceeded" } }));
