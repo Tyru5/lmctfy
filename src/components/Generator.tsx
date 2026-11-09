@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { createServerFn } from "@tanstack/react-start";
-import { AGENTS, MAX_PROMPT, buildSharePath, parseAgent, type AgentId } from "@/lib/agents";
+import { AGENTS, MAX_PROMPT, TONES, buildSharePath, parseAgent, type AgentId, type ToneId } from "@/lib/agents";
 
 const signQ = createServerFn()
   .inputValidator((d: { q: string; agent: AgentId }) => ({ q: d.q.trim().slice(0, MAX_PROMPT), agent: parseAgent(d.agent) }))
@@ -9,6 +9,7 @@ const signQ = createServerFn()
 export default function Generator({ agentId }: { agentId: AgentId }) {
   const agent = AGENTS[agentId];
   const [q, setQ] = useState("");
+  const [tone, setTone] = useState<ToneId>("classic");
   const [copied, setCopied] = useState(false);
   const [sig, setSig] = useState<{ q: string; agent: AgentId; s: string } | null>(null);
   const origin = useSyncExternalStore(() => () => {}, () => window.location.origin, () => "");
@@ -26,7 +27,7 @@ export default function Generator({ agentId }: { agentId: AgentId }) {
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
   }, [q, ready, agentId]);
-  const path = buildSharePath(q, sig?.q === q && sig.agent === agentId ? sig.s : "", agentId);
+  const path = buildSharePath(q, sig?.q === q && sig.agent === agentId ? sig.s : "", agentId, tone);
   const url = origin + path;
 
   async function copy() {
@@ -64,6 +65,21 @@ export default function Generator({ agentId }: { agentId: AgentId }) {
           aria-label="Question"
           className="flex-1 bg-transparent outline-none resize-none"
         />
+      </div>
+
+      <div role="group" aria-label="Tone" className="flex items-center gap-3 text-xs text-muted">
+        <span>Tone</span>
+        {(Object.keys(TONES) as ToneId[]).map((id) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={tone === id}
+            onClick={() => setTone(id)}
+            className="py-1 hover:text-fg aria-pressed:text-fg aria-pressed:underline decoration-line underline-offset-4 focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-fg"
+          >
+            {TONES[id].label}
+          </button>
+        ))}
       </div>
 
       <div className="flex gap-2">

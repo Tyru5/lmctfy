@@ -46,7 +46,7 @@ export const Route = createFileRoute("/api/run")({
             let ok = true;
             const send = (e: RunEvent) => {
               if (e.type === "error") ok = false;
-              if (e.type === "text" || e.type === "tool") transcript.push(e);
+              if (e.type === "text" || e.type === "tool" || e.type === "receipt") transcript.push(e);
               try { controller.enqueue(sse(e)); } catch {}
             };
             const ping = setInterval(() => { try { controller.enqueue(enc.encode(": ping\n\n")); } catch {} }, 15_000);

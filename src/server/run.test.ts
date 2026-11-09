@@ -30,6 +30,7 @@ test("Codex JSONL becomes a transcript across chunk boundaries without duplicate
         JSON.stringify({ type: "item.updated", item: { type: "agent_message", text: "partial" } }),
         JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "Answer: 42 🤖" } }),
         JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "**Done.**" } }),
+        JSON.stringify({ type: "turn.completed", usage: { input_tokens: 1200, cached_input_tokens: 1000, output_tokens: 34 } }),
       ].join("\n");
       // Split within a UTF-8 character; the final record has no newline.
       const bytes = Buffer.from(jsonl);
@@ -42,10 +43,13 @@ test("Codex JSONL becomes a transcript across chunk boundaries without duplicate
   }));
   const events: RunEvent[] = [];
   await runAgent("What is 6 × 7?", (event) => events.push(event), new AbortController().signal, "codex");
-  assert.deepEqual(events.filter((event) => event.type !== "status"), [
+  const receipt = events.find((event) => event.type === "receipt");
+  assert.ok(receipt && receipt.type === "receipt" && receipt.seconds >= 0);
+  assert.deepEqual(events.filter((event) => event.type !== "status").map((e) => e.type === "receipt" ? { ...e, seconds: 0 } : e), [
     { type: "tool", text: "$ printf 42" },
     { type: "text", text: "Answer: 42 🤖\n" },
     { type: "text", text: "**Done.**\n" },
+    { type: "receipt", seconds: 0, tokens: 1234 },
     { type: "done", exitCode: 0 },
   ]);
   assert.equal(stopped, true);

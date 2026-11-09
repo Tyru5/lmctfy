@@ -3,14 +3,28 @@ import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Terminal from "@/components/Terminal";
-import { AGENTS, type AgentId } from "@/lib/agents";
+import { AGENTS, TONES, terminalCommand, type AgentId, type ToneId } from "@/lib/agents";
 
 type Line = { text: string; color?: string; muted?: boolean; prefix?: string; prefixColor?: string };
 type Typing = { prefix: string; prefixColor?: string; text: string } | null;
+type Receipt = { seconds: number; costUsd?: number; tokens?: number };
 
-export default function Player({ q, sig, live, agentId }: { q: string; sig: string; live: boolean; agentId: AgentId }) {
+function describeReceipt({ seconds, costUsd, tokens }: Receipt) {
+  const spent = costUsd !== undefined
+    ? ` and cost $${costUsd < 0.01 ? costUsd.toFixed(4) : costUsd.toFixed(2)}`
+    : tokens !== undefined ? ` and ${tokens.toLocaleString("en-US")} tokens` : "";
+  return `This answer took ${seconds}s${spent}. Your coworker's time: priceless.`;
+}
+
+export default function Player({ q, sig, live, agentId, tone: toneId = "classic" }: {
+  q: string; sig: string; live: boolean; agentId: AgentId; tone?: ToneId;
+}) {
   const agent = AGENTS[agentId];
+  const tone = TONES[toneId];
   const target = agent.webUrl(q);
+  const command = terminalCommand(agentId, q);
+  const [copied, setCopied] = useState(false);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
 
   const [lines, setLines] = useState<Line[]>([]);
   const [typing, setTyping] = useState<Typing>(null);
@@ -46,7 +60,7 @@ export default function Player({ q, sig, live, agentId }: { q: string; sig: stri
     function finish() {
       if (cancelled) return;
       setStatus(null);
-      setStep("Was that so hard?");
+      setStep(tone.done);
       setDone(true);
     }
 
@@ -64,11 +78,12 @@ export default function Player({ q, sig, live, agentId }: { q: string; sig: stri
       }, 16);
       let sawError = false;
       es.onmessage = (m) => {
-        let e: { type: string; text?: string; message?: string };
+        let e: { type: string; text?: string; message?: string } & Partial<Receipt>;
         try { e = JSON.parse(m.data); } catch { return; }
         if (e.type === "status") setStatus(e.text ?? null);
         else if (e.type === "text") { setStatus(null); pendingRef.current += e.text ?? ""; }
         else if (e.type === "tool") { setStatus(null); push({ text: e.text ?? "", prefix: "⏺ ", prefixColor: agent.color, muted: true }); }
+        else if (e.type === "receipt") setReceipt({ seconds: e.seconds ?? 0, costUsd: e.costUsd, tokens: e.tokens });
         else if (e.type === "error") { sawError = true; push({ text: `(${e.message ?? "failed"})`, muted: true }); }
         else if (e.type === "done") { es?.close(); waitForReveal().then(finish); }
       };
@@ -100,13 +115,13 @@ export default function Player({ q, sig, live, agentId }: { q: string; sig: stri
       }
       await sleep(250);
       setTyping({ prefix: `${agent.promptChar} `, prefixColor: agent.color, text: "" });
-      setStep("Step 1: Type in your question");
+      setStep(tone.type);
       await sleep(400);
       const perChar = Math.max(12, Math.min(35, 1800 / Math.max(q.length, 1)));
       await type(`${agent.promptChar} `, agent.color, q, perChar);
       if (cancelled) return;
       setTyping({ prefix: `${agent.promptChar} `, prefixColor: agent.color, text: q });
-      setStep("Step 2: Press Enter");
+      setStep(tone.enter);
       await sleep(600);
       if (cancelled) return;
       setTyping(null);
@@ -128,11 +143,22 @@ export default function Player({ q, sig, live, agentId }: { q: string; sig: stri
       setStep(null);
       setStatus(null);
       setOutput("");
+      setReceipt(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const showSkip = !done && !status && !output;
+
+  async function copyCommand() {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      window.prompt("Copy:", command);
+    }
+  }
 
   return (
     <div className="w-full max-w-xl mx-auto flex flex-col gap-4">
@@ -167,6 +193,7 @@ export default function Player({ q, sig, live, agentId }: { q: string; sig: stri
             </div>
           </div>
         )}
+        {done && receipt && <div className="pop mt-2 text-muted">{describeReceipt(receipt)}</div>}
         {status && (
           <div className="mt-2" style={{ color: agent.color }}>
             <span className="spin">✻</span> {status}…
@@ -179,14 +206,29 @@ export default function Player({ q, sig, live, agentId }: { q: string; sig: stri
         )}
       </Terminal>
 
-      <div className="h-9 text-center text-sm">
+      <div className="min-h-28 text-center text-sm">
         {done && (
-            <p className="pop text-muted">
-              {live ? "Or " : "Now "}
+          <div className="pop flex flex-col gap-2">
+            <p className="text-muted">Next time, run it yourself:</p>
+            <div className="flex min-w-0 items-center gap-2 rounded-lg border border-line bg-elev py-1.5 pl-3 pr-1.5 font-mono text-left">
+              <span className="text-muted" aria-hidden>$</span>
+              <code className="min-w-0 flex-1 truncate" title={command}>{command}</code>
+              <button
+                type="button"
+                onClick={copyCommand}
+                className="shrink-0 rounded-md px-3 py-1 text-xs font-medium text-black"
+                style={{ background: agent.color }}
+              >
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <p className="text-muted">
+              or{" "}
               <a href={target} className="text-fg underline underline-offset-2">
-                ask {agent.short} yourself
+                ask {agent.short} on the web
               </a>
             </p>
+          </div>
         )}
       </div>
 

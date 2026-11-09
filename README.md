@@ -15,7 +15,8 @@ npm run typecheck
 
 Switch between Claude and Codex at the top of the landing page without losing your question. Claude appears first and is selected by default.
 The URL remembers the choice: `/?a=codex` or `/?a=claude`.
-Generated links: `/go?a=<agent>&d=<base64url-question>&s=<signature>`.
+Generated links: `/go?a=<agent>&d=<base64url-question>&s=<signature>`, plus `&t=polite` or `&t=savage` when the
+sender picks a tone other than Classic. The tone only changes the captions and is not signed.
 Links without `a` default to Claude; legacy `/go?q=<question>` links still play the animation.
 
 ## Live runs
@@ -47,7 +48,9 @@ How a run works (`src/server/run.ts`):
 
 The landing-page Codex symbol and Claude mascot keep the original peek animation.
 The favicon follows the selected agent on landing and share pages. Share pages never redirect automatically.
-The final link opens the selected agent on the web; Codex does not support prefilling a task.
+When the animation ends, the share page offers a copyable `claude '…'` or `codex '…'` command, then a link that opens
+the selected agent on the web; Codex does not support prefilling a task. Successful live runs end with a receipt:
+run time plus cost (Claude) or tokens (Codex).
 
 Codex has no equivalent to Claude Code's per-run dollar budget flag. The 60-second
 timeout and run limits remain; use a provider or Gateway budget for a spend ceiling.

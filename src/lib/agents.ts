@@ -29,6 +29,29 @@ export function parseAgent(value: unknown): AgentId {
   throw new Error("Unknown agent");
 }
 
+export const TONES = {
+  polite: { label: "Polite", type: "Step 1: Type your question", enter: "Step 2: Press Enter", done: "Happy to help!" },
+  classic: { label: "Classic", type: "Step 1: Type in your question", enter: "Step 2: Press Enter", done: "Was that so hard?" },
+  savage: {
+    label: "Savage",
+    type: "Step 1: Type the question you sent me",
+    enter: "Step 2: Press Enter. Yes, that key.",
+    done: "That took less time than messaging me.",
+  },
+};
+
+export type ToneId = keyof typeof TONES;
+
+/** Unknown or missing tones fall back to classic so older links keep working. */
+export function parseTone(value: unknown): ToneId {
+  return value === "polite" || value === "savage" ? value : "classic";
+}
+
+/** A one-liner that opens the agent's CLI with the question; single quotes keep the shell from expanding it. */
+export function terminalCommand(agent: AgentId, q: string): string {
+  return `${AGENTS[agent].cmd} '${q.replaceAll("'", `'\\''`)}'`;
+}
+
 export const MAX_PROMPT = 2000;
 
 function encodeQuestion(q: string): string {
@@ -52,8 +75,9 @@ export function parseShareQuestion(search: Record<string, unknown>): string {
   return String(search.q ?? "").trim().slice(0, MAX_PROMPT);
 }
 
-export function buildSharePath(q: string, s = "", agent: AgentId = "claude") {
+export function buildSharePath(q: string, s = "", agent: AgentId = "claude", tone: ToneId = "classic") {
   const p = new URLSearchParams({ a: agent, d: encodeQuestion(q.trim().slice(0, MAX_PROMPT)) });
   if (s) p.set("s", s);
+  if (tone !== "classic") p.set("t", tone);
   return `/go?${p.toString()}`;
 }

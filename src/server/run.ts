@@ -8,6 +8,7 @@ export type RunEvent =
   | { type: "status"; text: string }
   | { type: "text"; text: string }
   | { type: "tool"; text: string }
+  | { type: "receipt"; seconds: number; costUsd?: number; tokens?: number }
   | { type: "done"; exitCode: number }
   | { type: "error"; message: string };
 
@@ -84,12 +85,15 @@ function parse(line: string, agent: AgentId): RunEvent[] {
         .filter((c: any) => c.type === "tool_use")
         .map((c: any) => ({ type: "tool", text: `${c.name}(${summarize(c.input)})` }));
     if (j.type === "result" && j.is_error) return [{ type: "error", message: String(j.result ?? "failed") }];
+    if (j.type === "result" && typeof j.total_cost_usd === "number") return [{ type: "receipt", seconds: 0, costUsd: j.total_cost_usd }];
     return [];
   }
   if (j.type === "item.completed" && j.item?.type === "agent_message" && typeof j.item.text === "string")
     return text(j.item.text + "\n");
   if (j.type === "item.started" && j.item?.type === "command_execution")
     return [{ type: "tool", text: `$ ${j.item.command}` }];
+  if (j.type === "turn.completed" && j.usage)
+    return [{ type: "receipt", seconds: 0, tokens: (j.usage.input_tokens ?? 0) + (j.usage.output_tokens ?? 0) }];
   if (j.type === "error" && /^Reconnecting/.test(String(j.message ?? "")))
     return [{ type: "status", text: "Reconnecting" }];
   if (j.type === "turn.failed" || j.type === "error")
@@ -138,9 +142,13 @@ export async function runAgent(q: string, emit: (e: RunEvent) => void, signal: A
     let buf = "";
     const decoder = new StringDecoder("utf8");
     let failed = false;
+    // usage arrives mid-stream; it is sent as one receipt once the run succeeds
+    const usage: { costUsd?: number; tokens?: number } = {};
     const out = (e: RunEvent) => {
       if (e.type === "error") failed = true;
-      emit(e);
+      if (e.type !== "receipt") return emit(e);
+      if (e.costUsd !== undefined) usage.costUsd = (usage.costUsd ?? 0) + e.costUsd;
+      if (e.tokens !== undefined) usage.tokens = (usage.tokens ?? 0) + e.tokens;
     };
     const sink = new Writable({
       write(chunk, _enc, cb) {
@@ -154,6 +162,7 @@ export async function runAgent(q: string, emit: (e: RunEvent) => void, signal: A
     let err = "";
     const errSink = new Writable({ write(c, _e, cb) { err += c.toString(); cb(); } });
 
+    const started = Date.now();
     const cmd = await sandbox.runCommand({
       cmd: agent,
       cwd: "/vercel/sandbox",
@@ -179,6 +188,8 @@ export async function runAgent(q: string, emit: (e: RunEvent) => void, signal: A
     });
     buf += decoder.end();
     if (buf) for (const e of parse(buf, agent)) out(e);
+    if (cmd.exitCode === 0 && !failed)
+      emit({ type: "receipt", seconds: Math.round((Date.now() - started) / 100) / 10, ...usage });
     if (cmd.exitCode !== 0 && !failed)
       emit({ type: "error", message: cmd.exitCode === 137 ? "took longer than a minute" : err.trim().split("\n").pop()?.slice(0, 200) || `exit ${cmd.exitCode}` });
     emit({ type: "done", exitCode: cmd.exitCode });

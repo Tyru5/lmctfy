@@ -2,9 +2,9 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeader } from "@tanstack/react-start/server";
 import Player from "@/components/Player";
-import { AGENTS, parseAgent, parseShareQuestion, type AgentId } from "@/lib/agents";
+import { AGENTS, parseAgent, parseShareQuestion, parseTone, type AgentId, type ToneId } from "@/lib/agents";
 
-type ShareSearch = { a: AgentId; d?: string; q?: string; s?: string };
+type ShareSearch = { a: AgentId; d?: string; q?: string; s?: string; t?: ToneId };
 
 const getPageData = createServerFn()
   .inputValidator((d: { q: string; s: string; agent: AgentId }) => ({ ...d, agent: parseAgent(d.agent) }))
@@ -23,6 +23,7 @@ export const Route = createFileRoute("/go")({
     if (typeof s.d === "string") search.d = s.d;
     else if (s.q !== undefined) search.q = String(s.q).trim();
     if (typeof s.s === "string" && s.s) search.s = s.s;
+    if (parseTone(s.t) !== "classic") search.t = parseTone(s.t);
     return search;
   },
   loaderDeps: ({ search }) => search,
@@ -53,11 +54,12 @@ function Go() {
   const q = parseShareQuestion(search);
   const s = search.s ?? "";
   const agentId = search.a;
+  const tone = parseTone(search.t);
   const { live } = Route.useLoaderData();
   return (
     <main data-agent={agentId} className="flex-1 flex flex-col items-center justify-center px-4 py-16 gap-8">
       {q ? (
-        <Player key={`${agentId}:${q}:${s}:${live}`} agentId={agentId} q={q} sig={s} live={live} />
+        <Player key={`${agentId}:${tone}:${q}:${s}:${live}`} agentId={agentId} tone={tone} q={q} sig={s} live={live} />
       ) : (
         <Link to="/" search={{ a: agentId }} className="text-muted hover:text-fg">
           Let me {AGENTS[agentId].short} that for you
